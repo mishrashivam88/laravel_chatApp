@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Chat App</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
@@ -161,11 +162,12 @@
             /* 56px is default navbar height */
         }
     </style>
+
+      @vite(['resources/js/app.js'])
+
 </head>
 
 <body>
-
-
     <!-- Navbar -->
     @include('layouts.navbar')
 
@@ -183,12 +185,7 @@
 
             @include('layouts.chats')
 
-            <div id="chat-input">
-                <!-- <i class="fa-regular fa-face-smile"></i> -->
-                <input type="text" placeholder="Type a message">
-                <!-- <i class="fa-solid fa-paperclip"></i> -->
-                <i class="fa-solid fa-paper-plane ms-2"></i>
-            </div>
+            @include('layouts.send')
         </div>
     </div>
 
@@ -198,6 +195,13 @@
         const chatMessages = document.getElementById('chat-messages');
         chatMessages.scrollTop = chatMessages.scrollHeight;
     </script>
+
+    <script>
+    window.authUser = {
+        id: @json(Auth::id()),
+        image: @json(Auth::check() ? asset('storage/profile_images/'.Auth::user()->profile_img) : '')
+    };
+</script>
 </body>
 
 </html>

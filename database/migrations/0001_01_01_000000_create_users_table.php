@@ -15,8 +15,9 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('email')->unique();
-            $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
+            $table->text('profile_img');
+            $table->enum('status' , [ 'online' ,' offline' , 'blocked'])->default('online');
             $table->rememberToken();
             $table->timestamps();
         });
