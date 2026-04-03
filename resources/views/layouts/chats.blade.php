@@ -1,18 +1,15 @@
-<!-- resources/views/chat.blade.php -->
-
-<!-- <div id="chat-messages">
-    <div class="message">
-        <img src="https://mdbcdn.b-cdn.net/img/Photos/new-templates/bootstrap-chat/ava1-bg.webp">
-        <div class="message-content">Hello! How are you?</div>
+<div id="chat-messages"  style="height: 100%;">
+    
+    <div class="mb-3">
+        <i class="fa-solid fa-comments" style="font-size: 60px; color: #0b93f6;"></i>
     </div>
-    <div class="message outgoing">
-        <img src="https://mdbcdn.b-cdn.net/img/Photos/new-templates/bootstrap-chat/ava6-bg.webp">
-        <div class="message-content">I'm good, thanks!</div>
-    </div>
-</div> -->
 
-<div id="chat-messages"></div>
+    <h5 class="fw-bold">Welcome to Chat App</h5>
+    
+    <p class="mb-1">Select a user from the left panel</p>
+    <small>Start chatting instantly ...!!!</small>
 
+</div>
 
 
 

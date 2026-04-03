@@ -8,6 +8,5 @@ use Illuminate\Support\Facades\Broadcast;
 
 Broadcast::channel('chat.{id}', function ($user, $id) {
     // Only allow user to join their own channel
-    return true ;
     return (int) $user->id === (int) $id ? ['id' => $user->id, 'name' => $user->name] : false;
 });

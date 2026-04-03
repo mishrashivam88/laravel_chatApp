@@ -14,11 +14,12 @@ window.Echo = new Echo({
     enabledTransports: ['ws', 'wss'],
 });
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
 
     const chatForm = document.getElementById('chat-form');
     const chatInput = document.getElementById('chat-text');
     const chatMessagesDiv = document.getElementById('chat-messages');
+    const contactsList = document.getElementById('contacts-list');
 
     let selectedUserId = null;
     let selectedUserImage = null;
@@ -27,56 +28,116 @@ document.addEventListener('DOMContentLoaded', function() {
     const authUserImage = window.authUser.image;
     const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
-    // -----------  User lookup table -----------
+    // ----------- HELPER: FORMAT UTC TIME TO IST -----------
+    function formatTimeToIST(utcTime) {
+        const date = new Date(utcTime);
+        return date.toLocaleTimeString('en-IN', {
+            timeZone: 'Asia/Kolkata',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        });
+    }
+
+    // ----------- MAP USER IMAGES + INIT LAST MESSAGE -----------
+    const contacts = Array.from(document.querySelectorAll('.contact-item'));
     const userImages = {};
-    document.querySelectorAll('.contact-item').forEach(c => {
+    contacts.forEach(c => {
         userImages[c.dataset.id] = c.dataset.image;
+        c.dataset.lastMessage = '1970-01-01T00:00:00Z'; // default old date
     });
 
-    // -----------  Message queue -----------
-    const messageQueue = []; // store messages until user selects
+    // ----------- REORDER CONTACTS BASED ON LAST MESSAGE -----------
+    function reorderContacts() {
+        const sorted = contacts.sort((a, b) => {
+            const timeA = new Date(a.dataset.lastMessage).getTime();
+            const timeB = new Date(b.dataset.lastMessage).getTime();
+            return timeB - timeA;
+        });
+        sorted.forEach(c => contactsList.appendChild(c));
+    }
 
-    // -----------  Display function -----------
+    // ----------- INITIAL LOAD: FETCH LAST MESSAGE FOR ALL CONTACTS -----------
+    const fetchPromises = contacts.map(contact => {
+        const userId = contact.dataset.id;
+        return fetch(`/messages/${userId}?latest=1`)
+            .then(res => res.json())
+            .then(messages => {
+                if (messages.length) {
+                    const lastMsg = messages[messages.length - 1];
+                    contact.dataset.lastMessage = lastMsg.created_at;
+
+                    const preview = contact.querySelector('.contact-preview');
+                    const timeElem = contact.querySelector('.contact-time');
+
+                    if (preview) preview.innerText = lastMsg.chat_messages;
+                    if (timeElem) timeElem.innerText = formatTimeToIST(lastMsg.created_at);
+                }
+            });
+    });
+
+    Promise.all(fetchPromises).then(() => {
+        reorderContacts(); // reorder after fetching all last messages
+    });
+
+    // ----------- DISPLAY MESSAGE IN CHAT WINDOW -----------
     function displayMessage(msg) {
         const senderImg = msg.sender_id == authUserId ? authUserImage : msg.sender_image || userImages[msg.sender_id];
         chatMessagesDiv.innerHTML += `
             <div class="message ${msg.sender_id == authUserId ? 'outgoing' : ''}">
                 <img src="${senderImg}" />
-                <div class="message-content">${msg.chat_messages}</div>
+                <div class="message-content">
+                    ${msg.chat_messages}
+                    <span class="message-time">${formatTimeToIST(msg.created_at)}</span>
+                </div>
             </div>
         `;
         chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
     }
 
-    // -----------  Contact click -----------
-    document.addEventListener('click', function(e) {
+    // ----------- CONTACT CLICK -----------
+    document.addEventListener('click', function (e) {
         const contact = e.target.closest('.contact-item');
         if (!contact) return;
 
         selectedUserId = contact.dataset.id;
         selectedUserImage = contact.dataset.image;
-        const userName = contact.dataset.name;
 
-        document.getElementById('chat-user-name').innerText = userName;
+        document.getElementById('chat-user-name').innerText = contact.dataset.name;
         document.getElementById('chat-user-img').src = selectedUserImage;
 
-        // Display queued messages for this user
-        chatMessagesDiv.innerHTML = '';
-        messageQueue.forEach(msg => {
-            if (msg.sender_id == selectedUserId || msg.receiver_id == selectedUserId) {
-                displayMessage(msg);
-            }
-        });
+        // Reset badge + unread count
+        const badge = contact.querySelector('.badge-dot');
+        if (badge) {
+            badge.classList.remove('bg-danger');
+            badge.classList.add('bg-success');
+        }
+        const countElem = contact.querySelector('.unread-count');
+        if (countElem) {
+            countElem.innerText = 0;
+            countElem.classList.add('d-none');
+        }
 
-        // Fetch older messages from backend
+        // Load messages for selected contact
+        chatMessagesDiv.innerHTML = '';
         fetch(`/messages/${selectedUserId}`)
             .then(res => res.json())
             .then(messages => {
                 messages.forEach(msg => displayMessage(msg));
+
+                // Update last message timestamp and reorder
+                if (messages.length) {
+                    contact.dataset.lastMessage = messages[messages.length - 1].created_at;
+                    const preview = contact.querySelector('.contact-preview');
+                    const timeElem = contact.querySelector('.contact-time');
+                    if (preview) preview.innerText = messages[messages.length - 1].chat_messages;
+                    if (timeElem) timeElem.innerText = formatTimeToIST(messages[messages.length - 1].created_at);
+                    reorderContacts();
+                }
             });
     });
 
-    // -----------  Send message -----------
+    // ----------- SEND MESSAGE -----------
     function sendMessage() {
         const message = chatInput.value.trim();
         if (!message || !selectedUserId) return;
@@ -94,34 +155,62 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(res => res.json())
         .then(msg => {
-            messageQueue.push(msg); // store sent message
             displayMessage(msg);
+
+            const contactElem = document.querySelector(`.contact-item[data-id="${selectedUserId}"]`);
+            if (contactElem) {
+                contactElem.dataset.lastMessage = msg.created_at || new Date().toISOString();
+                const preview = contactElem.querySelector('.contact-preview');
+                const timeElem = contactElem.querySelector('.contact-time');
+                if (preview) preview.innerText = msg.chat_messages;
+                if (timeElem) timeElem.innerText = formatTimeToIST(msg.created_at);
+            }
+
+            reorderContacts();
             chatInput.value = '';
         });
     }
 
-    chatForm.addEventListener('submit', function(e) {
+    chatForm.addEventListener('submit', e => {
         e.preventDefault();
         sendMessage();
     });
 
-    // ----------- Echo listener (Realtime) -----------
+    // ----------- REALTIME LISTENER -----------
     window.Echo.private(`chat.${authUserId}`)
         .listen('.message.sent', (msg) => {
-            if (!msg.sender_id) return; // safety check
+            const m = msg.message;
+            if (!m.sender_id) return;
 
-            messageQueue.push(msg); // store all incoming messages
+            const contactElem = document.querySelector(`.contact-item[data-id="${m.sender_id}"]`);
+            if (contactElem) {
+                contactElem.dataset.lastMessage = m.created_at;
 
-            // Display immediately if current chat is open with sender/receiver
-            if (selectedUserId == msg.sender_id || selectedUserId == msg.receiver_id) {
-                displayMessage(msg);
+                const preview = contactElem.querySelector('.contact-preview');
+                const timeElem = contactElem.querySelector('.contact-time');
+                if (preview) preview.innerText = m.chat_messages;
+                if (timeElem) timeElem.innerText = formatTimeToIST(m.created_at);
+            }
+
+            reorderContacts();
+
+            if (selectedUserId == m.sender_id || selectedUserId == m.receiver_id) {
+                displayMessage(m);
             } else {
-                // Optional: show notification badge for new message
-                const contactElem = document.querySelector(`.contact-item[data-id="${msg.sender_id}"]`);
-                if (contactElem && !contactElem.classList.contains('new-message')) {
-                    contactElem.classList.add('new-message');
+                // Show unread badge + count
+                if (contactElem) {
                     const badge = contactElem.querySelector('.badge-dot');
-                    if (badge) badge.classList.add('bg-danger');
+                    if (badge) {
+                        badge.classList.remove('bg-success');
+                        badge.classList.add('bg-danger');
+                    }
+
+                    const countElem = contactElem.querySelector('.unread-count');
+                    if (countElem) {
+                        countElem.classList.remove('d-none');
+                        let current = parseInt(countElem.innerText) || 0;
+                        countElem.innerText = current + 1 > 99 ? '99+' : current + 1;
+                    }
                 }
             }
         });

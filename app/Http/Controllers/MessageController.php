@@ -25,7 +25,7 @@ class MessageController extends Controller
         'receiver_id' => $request->receiver_id,
     ]);
 
-    Log::info('Broadcasting message', ['message' => $message]);
+    // Log::info('Broadcasting message', ['message' => $message]);
 
     broadcast(new SendMessage($message))->toOthers(); // do not send to self
 

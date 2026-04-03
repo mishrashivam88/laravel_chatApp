@@ -21,6 +21,31 @@
             font-family: Arial, sans-serif;
         }
 
+        .badge-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            position: absolute;
+            top: 0px;
+            left: 40px;
+            /* contact image ke right */
+        }
+
+        .contact-info {
+            display: flex;
+            align-items: center;
+            flex-grow: 1;
+            position: relative;
+        }
+
+        .unread-count {
+            position: absolute;
+            right: 0px;
+            top: 0px;
+            font-size: 12px;
+        }
+
         #chat-container {
             height: 100vh;
             display: flex;
@@ -28,6 +53,7 @@
             background: #fff;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
+
 
         #chat-header {
             border-bottom: 1px solid #ddd;
@@ -62,6 +88,7 @@
             align-items: center;
             padding: 0.75rem 1rem;
             cursor: pointer;
+            position: relative;
             transition: background 0.2s;
         }
 
@@ -163,7 +190,7 @@
         }
     </style>
 
-      @vite(['resources/js/app.js'])
+    @vite(['resources/js/app.js'])
 
 </head>
 
@@ -179,7 +206,7 @@
         <div id="chat">
             <div id="chat-header">
 
-               @include('layouts.right_upper')
+                @include('layouts.right_upper')
 
             </div>
 
@@ -197,11 +224,11 @@
     </script>
 
     <script>
-    window.authUser = {
-        id: @json(Auth::id()),
-        image: @json(Auth::check() ? asset('storage/profile_images/'.Auth::user()->profile_img) : '')
-    };
-</script>
+        window.authUser = {
+            id: @json(Auth::id()),
+            image: @json(Auth::check() ? asset('storage/profile_images/'.Auth::user() -> profile_img) : '')
+        };
+    </script>
 </body>
 
 </html>
