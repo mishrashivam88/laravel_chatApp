@@ -27,7 +27,7 @@ class MessageController extends Controller
             'receiver_id' => $request->receiver_id,
         ]);
 
-        //  LOAD sender relation (IMAGE FIX)
+       
         $message->load('sender');
 
         //  BROADCAST (NO toOthers)
@@ -42,7 +42,7 @@ class MessageController extends Controller
     // GET CHAT MESSAGES
     public function getMessages(User $user)
     {
-        $messages = Message::with('sender') //  IMPORTANT
+        $messages = Message::withTrashed()->with('sender')
             ->where(function ($q) use ($user) {
                 $q->where('sender_id', Auth::id())
                     ->where('receiver_id', $user->id);
@@ -55,10 +55,21 @@ class MessageController extends Controller
             ->get();
 
         //  attach sender image
-        $messages->transform(function ($msg) {
-            $msg->sender_image = $msg->sender->image ?? null;
-            return $msg;
-        });
+       $messages->transform(function ($msg) {
+
+    $msg->sender_image = $msg->sender->image ?? null;
+
+    //  SOFT DELETE FIX
+    if ($msg->deleted_at) {
+        if ($msg->sender_id == Auth::id()) {
+            $msg->chat_messages = '<i>Deleted by you</i>';
+        } else {
+            $msg->chat_messages = '<i>Deleted by author</i>';
+        }
+    }
+
+    return $msg;
+});
 
         //  UNREAD FIX (delivered based)
         $unreadCount = Message::where('sender_id', $user->id)
@@ -96,7 +107,7 @@ class MessageController extends Controller
             'updated' => $messages->count()
         ]);
     }
-    
+
     public function markDelivered()
     {
         $messages = Message::where('receiver_id', Auth::id())
@@ -127,6 +138,7 @@ class MessageController extends Controller
         }
 
         $message->delete();
+       
 
         broadcast(new MessageDeleted($message));
 

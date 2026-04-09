@@ -275,6 +275,7 @@
             id: @json(Auth::id()),
             image: @json(Auth::check() ? asset('storage/profile_images/'.Auth::user() -> profile_img) : '')
         };
+         
         window.authToken = "{{ session('auth_token') }}";
     </script>
 </body>

@@ -45,7 +45,7 @@
             $lastTime = $lastMsg ? $lastMsg->created_at : '';
             @endphp
 
-            <div class="contact-item" data-id="{{ $user->id }}" data-name="{{ $user->name }}" data-image="{{ asset('storage/profile_images/'.$user->profile_img) }}" data-last-message="{{ $lastTime }}">
+            <div class="contact-item" data-id="{{ $user->id }}" data-name="{{ $user->name }}" data-email="{{ $user->email }}" data-image="{{ asset('storage/profile_images/'.$user->profile_img) }}" data-last-message="{{ $lastTime }}">
                 <div class="contact-info">
                     <img src="{{ asset('storage/profile_images/'.$user->profile_img) }}">
                     <div>
@@ -76,7 +76,9 @@
 
             Array.from(contacts).forEach(contact => {
                 const name = contact.getAttribute('data-name').toLowerCase();
-                if (name.includes(filter)) {
+                const email = contact.getAttribute('data-email').toLowerCase();
+
+                if (name.includes(filter) || email.includes(filter)) {
                     contact.style.display = '';
                 } else {
                     contact.style.display = 'none';

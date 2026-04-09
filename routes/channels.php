@@ -4,20 +4,23 @@ use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Log;
 Broadcast::routes(['middleware' => ['web', 'auth']]);
 
-Broadcast::channel('chat-presence', function ($user) {
+// Broadcast::channel('chat-presence', function ($user) {
 
-    // file_put_contents(storage_path('logs/user.txt'), json_encode($user));
+//     // file_put_contents(storage_path('logs/user.txt'), json_encode($user));
 
-    if (!$user) {
-        return false;
-    }
+//     if (!$user) {
+//         return false;
+//     }
 
-    return [
-        'id' => $user->id,
-        'name' => $user->name,
-    ];
+//     return [
+//         'id' => $user->id,
+//         'name' => $user->name,
+//     ];
+// });
+
+Broadcast::channel('online-users', function ($user) {
+    return ['id' => $user->id];
 });
-
 
 Broadcast::channel('chat.{id}', function ($user, $id) {
     return (int) $user->id === (int) $id;
