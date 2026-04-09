@@ -21,6 +21,21 @@
             font-family: Arial, sans-serif;
         }
 
+        .message {
+            display: flex;
+            margin-bottom: 10px;
+        }
+
+        .message-content {
+            padding: 10px;
+            border-radius: 10px;
+            background: #0d6efd;
+            color: #1a0202;
+            max-width: 60%;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+        }
+
         .contact-preview {
             display: inline-block;
             max-width: 150px;
@@ -275,7 +290,7 @@
             id: @json(Auth::id()),
             image: @json(Auth::check() ? asset('storage/profile_images/'.Auth::user() -> profile_img) : '')
         };
-         
+
         window.authToken = "{{ session('auth_token') }}";
     </script>
 </body>
