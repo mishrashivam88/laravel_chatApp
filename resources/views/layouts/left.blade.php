@@ -4,9 +4,7 @@
             width: 40px;
             height: 40px;
             object-fit: cover;
-            /* image crop ho jayegi nicely */
             border-radius: 50%;
-            /* perfect circle */
         }
     </style>
 
@@ -14,7 +12,12 @@
     use App\Models\User;
     use App\Models\Message;
 
-    $users = User::whereNot('id', Auth::id())->get();
+    $users = User::where('id', '!=', Auth::id())
+    ->withCount(['messages as unreadMessagesCount' => function ($q) {
+    $q->where('receiver_id', Auth::id())
+    ->where('seen', 0);
+    }])
+    ->get();
 
     // function to get last message with this user
     function getLastMessage($userId) {
@@ -50,9 +53,11 @@
                         <small class="text-muted contact-preview">{{ $lastText }}</small>
                         <span class="contact-time">{{ $lastTime ? date('h:i A', strtotime($lastTime)) : '' }}</span>
                     </div>
-                    <span class="unread-count badge bg-danger d-none">{{ $user->unreadMessagesCount ?? 0 }}</span>
+                    <span class="unread-count badge bg-danger {{ $user->unreadMessagesCount ? '' : 'd-none' }}">
+                        {{ $user->unreadMessagesCount }}
+                    </span>
                 </div>
-                <span class="badge-dot bg-success"></span>
+                <span class="badge-dot bg-secondary"></span>
             </div>
             @endforeach
         </div>
@@ -60,7 +65,7 @@
     </div>
 
 
-    <script>  
+    <script>
         //search logic 
         const searchInput = document.getElementById('searchInput');
         const contactsList = document.getElementById('contacts-list');

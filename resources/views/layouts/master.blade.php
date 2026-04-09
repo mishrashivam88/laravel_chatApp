@@ -21,15 +21,67 @@
             font-family: Arial, sans-serif;
         }
 
+        .contact-preview {
+            display: inline-block;
+            max-width: 150px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            right: 10px;
+            top: 30px;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            z-index: 10;
+        }
+
+        .dropdown-menu div {
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+
+        .dropdown-menu div:hover {
+            background: #f2f2f2;
+        }
+
+        .message-content {
+            position: relative;
+        }
+
+        .tick {
+            color: gray;
+        }
+
+        .tick.delivered {
+            color: gray;
+        }
+
+        .tick.seen {
+            color: blue;
+        }
+
         .badge-dot {
             width: 10px;
             height: 10px;
             border-radius: 50%;
-            border: 2px solid #fff;
             position: absolute;
-            top: 0px;
+            top: 5px;
             left: 40px;
-            /* contact image ke right */
+            border: 2px solid #fff;
+        }
+
+        .bg-success {
+            background-color: #28a745 !important;
+            /* online */
+        }
+
+        .bg-secondary {
+            background-color: #6c757d !important;
+            /* offline */
         }
 
         .contact-info {
@@ -185,8 +237,7 @@
         }
 
         #chat-container {
-            height: calc(100vh - 56px);
-            /* 56px is default navbar height */
+            height: calc(100vh - 64px);
         }
     </style>
 
@@ -205,13 +256,9 @@
         <!-- Right chat -->
         <div id="chat">
             <div id="chat-header">
-
                 @include('layouts.right_upper')
-
             </div>
-
             @include('layouts.chats')
-
             @include('layouts.send')
         </div>
     </div>
@@ -228,6 +275,7 @@
             id: @json(Auth::id()),
             image: @json(Auth::check() ? asset('storage/profile_images/'.Auth::user() -> profile_img) : '')
         };
+        window.authToken = "{{ session('auth_token') }}";
     </script>
 </body>
 

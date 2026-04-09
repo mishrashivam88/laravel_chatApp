@@ -12,7 +12,10 @@ class Message extends Model
     protected $fillable = [
         'chat_messages' ,
         'sender_id',
-        'receiver_id'
+        'receiver_id', 
+        'seen',
+        'delivered',
+        'deleted_at'
     ];
 
     public function sender(){

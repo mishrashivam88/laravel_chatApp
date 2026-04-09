@@ -32,18 +32,5 @@ class AuthService
             'user' => $user,
             'token' => $token
         ];
-    }
-
-    public function login($data)
-    {
-        if (Auth::attempt(['email' => $data['email'], 'password' => $data['password']])) {
-            $id = Auth::id();
-            $user = User::findOrFail($id);
-            $token = $user->createToken('token')->plainTextToken;
-            return [
-                'user' => $user, 
-                'token' => $token
-            ];
-        }
-    }
+    }   
 }

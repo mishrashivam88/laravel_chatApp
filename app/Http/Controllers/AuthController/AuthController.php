@@ -30,19 +30,25 @@ class AuthController extends Controller
         return redirect()->route('register')->with('error' , 'Something went wrong ');
     }
 
-    public function login(Request $request){
+    public function login(Request $request)
+{
+    $request->validate([
+        'email' => 'required|email',
+        'password' => 'required'
+    ]);
 
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required'
-        ]);
-
-        $data = $this->authService->login($request->all());
-         if($data)
-        return redirect('/')->with('success' , 'User Registered Successfully');
-          
-        return redirect()->route('login')->with('error' , 'Something went wrong while log in ');
+    if (Auth::attempt([
+        'email' => $request->email,
+        'password' => $request->password
+    ])) {
+        $request->session()->regenerate();
+        return redirect('/');
     }
+
+    return back()->withErrors([
+        'email' => 'Invalid credentials'
+    ]);
+}
 
     public function logout(){       
         Auth::logout();
