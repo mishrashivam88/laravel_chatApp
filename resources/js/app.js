@@ -110,22 +110,42 @@ function initContacts() {
 
 function loadLastMessages() {
     const promises = contacts.map(contact => {
-        const userId = contact.dataset.id;
-
+        const userId = contact.dataset.id;        
         return fetch(`/messages/${userId}?latest=1`)
             .then(res => res.json())
             .then(messages => {
                 if (messages.length) {
-                    const lastMsg = messages[messages.length - 1];
+    const lastMsg = [...messages].reverse().find(m => !m.is_deleted) 
+                  || messages[messages.length - 1];
 
-                    contact.dataset.lastMessage = lastMsg.created_at;
+    contact.dataset.lastMessage = lastMsg.created_at;
+    contact.dataset.lastMessageId = lastMsg.id;
 
-                    const preview = contact.querySelector('.contact-preview');
-                    const timeElem = contact.querySelector('.contact-time');
+    const preview = contact.querySelector('.contact-preview');
+    const timeElem = contact.querySelector('.contact-time');
 
-                    if (preview) preview.innerText = lastMsg.chat_messages;
-                    if (timeElem) timeElem.innerText = formatTimeToIST(lastMsg.created_at);
-                }
+   
+    if (preview) {
+        if (lastMsg.is_deleted) {
+            preview.innerText = lastMsg.chat_messages.replace(/<[^>]+>/g, '');
+        } else if (lastMsg.file_type === 'image') {
+            preview.innerText = '📷 Image';
+        } else if (lastMsg.file_type === 'video') {
+            preview.innerText = '🎥 Video';
+        } else if (lastMsg.file_type === 'file') {
+            preview.innerText = '📄 File';
+        } else {
+            preview.innerText = lastMsg.chat_messages;
+        }
+    }
+    if (timeElem) {
+        if (lastMsg.is_deleted) {
+            timeElem.innerText = ''; 
+        } else {
+            timeElem.innerText = formatTimeToIST(lastMsg.created_at);
+        }
+    }
+}
             });
     });
 
@@ -154,12 +174,16 @@ function initChat() {
     });
 
     document.addEventListener('click', handleContactClick);
+    chatMessagesDiv.addEventListener('scroll', () => {
+        if (chatMessagesDiv.scrollTop === 0 && !loading && hasMore) {
+            loadMoreMessages();
+        }
+    });
 }
 
 function handleContactClick(e) {
     const contact = e.target.closest('.contact-item');
     if (!contact) return;
-
     selectedUserId = contact.dataset.id;
     selectedUserImage = contact.dataset.image;
 
@@ -186,13 +210,60 @@ function resetUnread(contact) {
     }
 }
 
+let currentPage = 1;
+let loading = false;
+let hasMore = true;
 function loadMessages() {
+    console.log("LOAD MESSAGES CALLED");
     chatMessagesDiv.innerHTML = '';
+    currentPage = 1;
+    hasMore = true;
 
-    fetch(`/messages/${selectedUserId}`)
+    fetch(`/messages/${selectedUserId}?page=1`)
+        .then(res =>{ 
+            console.log("API RESPONSE STATUS:", res.status);
+            return res.json()
+        }
+        )
+        .then(data => {
+            console.log("FULL API DATA:", data);
+             const messages = data.messages?.data || [];
+             console.log("MESSAGES ARRAY:", messages);
+            renderMessages(messages, true);
+            hasMore = data.messages.next_page_url !== null; 
+        });
+}
+function renderMessages(messages, scrollBottom = false) {
+     if (!messages || !Array.isArray(messages)) return;
+    messages.reverse().forEach(msg => displayMessage(msg, false)); 
+
+    if (scrollBottom) {
+        chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+    }
+}
+
+function loadMoreMessages() {
+
+    loading = true;
+    currentPage++;
+
+    let oldHeight = chatMessagesDiv.scrollHeight;
+
+    fetch(`/messages/${selectedUserId}?page=${currentPage}`)
         .then(res => res.json())
         .then(data => {
-            data.messages.forEach(displayMessage);
+            const messages = data.messages?.data || []; 
+
+            messages.reverse().forEach(msg => {
+                displayMessage(msg, true); 
+            });
+
+            let newHeight = chatMessagesDiv.scrollHeight;
+
+            chatMessagesDiv.scrollTop = newHeight - oldHeight;
+
+            hasMore = data.messages.next_page_url !== null;
+            loading = false;
         });
 }
 
@@ -207,61 +278,98 @@ function markSeen() {
     });
 }
 
-//  SEND 
 function sendMessage() {
     const message = chatInput.value.trim();
-    if (!message || !selectedUserId) return;
+    const fileInput = document.getElementById('fileInput');
+
+    if (!message && !fileInput.files[0]) return;
+
+    let formData = new FormData();
+    formData.append('chat_messages', message);
+    formData.append('receiver_id', selectedUserId);
+
+    if (fileInput.files[0]) {
+        formData.append('file', fileInput.files[0]);
+    }
 
     fetch('/send-message', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
             'X-CSRF-TOKEN': token
         },
-        body: JSON.stringify({
-            chat_messages: message,
-            receiver_id: selectedUserId
-        })
+        body: formData
     })
     .then(res => res.json())
     .then(msg => {
+        console.log(msg);
         displayMessage(msg);
         updateSidebar(selectedUserId, msg);
         chatInput.value = '';
+        fileInput.value = '';
     });
 }
 
 //  DISPLAY 
-function displayMessage(msg) {
+function displayMessage(msg , prepend = false) {
+
+    if (typeof msg === 'string') {
+        try { msg = JSON.parse(msg); } catch { return; }
+    }
+
     const senderImg = msg.sender_id == authUserId
         ? authUserImage
         : msg.sender_image || userImages[msg.sender_id];
 
-    let tickHtml = '';
+    let mediaHtml = '';
 
-    if (msg.sender_id == authUserId) {
-        let ticks = '✔';
-        let cls = '';
-
-        if (msg.seen) { ticks = '✔✔'; cls = 'seen'; }
-        else if (msg.delivered) { ticks = '✔✔'; cls = 'delivered'; }
-
-        tickHtml = `<span class="tick ${cls}">${ticks}</span>`;
+   
+    if (msg.file_type === 'image' && msg.file_url) {
+    mediaHtml = `
+        <div class="media-message">
+            <img src="${msg.file_url}" 
+                 class="chat-image"
+                  onload="scrollToBottom()"
+                 onclick="openImage('${msg.file_url}')">
+        </div>
+    `;
+}
+    //  VIDEO
+    else if (msg.file_type === 'video' && msg.file_url) {
+        mediaHtml = `
+            <video controls class="chat-video">
+                <source src="${msg.file_url}">
+            </video>
+        `;
+    } 
+    
+    //  FILE
+    else if (msg.file_type === 'file' && msg.file_url) {
+        mediaHtml = `
+            <a href="${msg.file_url}" target="_blank" class="chat-file">
+                 Download File
+            </a>
+        `;
     }
 
-    chatMessagesDiv.innerHTML += `
+     let html = `
         <div class="message ${msg.sender_id == authUserId ? 'outgoing' : ''}" data-id="${msg.id}">
-            <img src="${senderImg}" />
+            <img src="${senderImg}" class="avatar" />
             <div class="message-content">
-                ${msg.chat_messages}
-                <span class="message-time">${formatTimeToIST(msg.created_at)}</span>
-                ${tickHtml}
+                ${msg.chat_messages ?? ''}
+                ${mediaHtml}
             </div>
         </div>
     `;
 
-    chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+    if (prepend) {
+        chatMessagesDiv.insertAdjacentHTML('afterbegin', html);
+    } else {
+        chatMessagesDiv.insertAdjacentHTML('beforeend', html);
+    }
+
+   
 }
+
 
 //  SIDEBAR
 function updateSidebar(userId, msg) {
@@ -269,11 +377,23 @@ function updateSidebar(userId, msg) {
     if (!contact) return;
 
     contact.dataset.lastMessage = msg.created_at;
+    contact.dataset.lastMessageId = msg.id;
 
     const preview = contact.querySelector('.contact-preview');
     const timeElem = contact.querySelector('.contact-time');
 
-    if (preview) preview.innerText = msg.chat_messages;
+    if (preview) {
+        if (msg.chat_messages) {
+            preview.innerText = msg.chat_messages;
+        } else if (msg.file_type === 'image') {
+            preview.innerText = '📷 Photo';
+        } else if (msg.file_type === 'video') {
+            preview.innerText = '🎥 Video';
+        } else {
+            preview.innerText = '📎 File';
+        }
+    }
+
     if (timeElem) timeElem.innerText = formatTimeToIST(msg.created_at);
 
     reorderContacts();
@@ -288,8 +408,8 @@ function initRealtime() {
     channel.listen('.message.deleted', handleDeleted);
 }
 
-function handleIncomingMessage(msg) {
-    const m = msg.message;
+function handleIncomingMessage(m) {
+
     const contact = document.querySelector(`.contact-item[data-id="${m.sender_id}"]`);
 
     fetch(`/messages/delivered`, {
@@ -343,36 +463,96 @@ function handleSeen(e) {
     });
 }
 
+// function handleDeleted(e) {
+//     const msgDiv = document.querySelector(`.message[data-id="${e.messageId}"]`);
+//     if (!msgDiv) return;
+
+//     const content = msgDiv.querySelector('.message-content');
+//     const time = content.querySelector('.message-time')?.outerHTML || '';
+//     const tick = content.querySelector('.tick')?.outerHTML || '';
+
+//     const text = (e.senderId == authUserId)
+//         ? "<i>Deleted by you</i>"
+//         : "<i>Deleted by author</i>";
+
+//     content.innerHTML = `${text} ${time} ${tick}`;
+
+//     const otherUserId = (e.senderId == authUserId) ? e.receiverId : e.senderId;
+//     const contact = document.querySelector(`.contact-item[data-id="${otherUserId}"]`);
+
+//     if (contact && contact.dataset.lastMessage == e.createdAt) {
+//         const preview = contact.querySelector('.contact-preview');
+//         if (preview) preview.innerText = "Message deleted";
+//     }
+// }
 function handleDeleted(e) {
     const msgDiv = document.querySelector(`.message[data-id="${e.messageId}"]`);
-    if (!msgDiv) return;
+    if (msgDiv) {
 
-    const content = msgDiv.querySelector('.message-content');
-    const time = content.querySelector('.message-time')?.outerHTML || '';
-    const tick = content.querySelector('.tick')?.outerHTML || '';
+        msgDiv.classList.add('deleted');
 
-    const text = (e.senderId == authUserId)
-        ? "<i>Deleted by you</i>"
-        : "<i>Deleted by author</i>";
+        const content = msgDiv.querySelector('.message-content');
+        content.innerHTML = '';
 
-    content.innerHTML = `${text} ${time} ${tick}`;
+        const text = (e.senderId == authUserId)
+            ? "<i>Deleted by you</i>"
+            : "<i>Deleted by author</i>";
 
-    const otherUserId = (e.senderId == authUserId) ? e.receiverId : e.senderId;
+        const deletedDiv = document.createElement('div');
+        deletedDiv.className = 'deleted-msg';
+        deletedDiv.innerHTML = text;
+
+        content.appendChild(deletedDiv);
+    }
+
+    const otherUserId = (e.senderId == authUserId)
+        ? e.receiverId
+        : e.senderId;
+
     const contact = document.querySelector(`.contact-item[data-id="${otherUserId}"]`);
 
-    if (contact && contact.dataset.lastMessage == e.createdAt) {
-        const preview = contact.querySelector('.contact-preview');
-        if (preview) preview.innerText = "Message deleted";
+    if (!contact) return;
+
+    const preview = contact.querySelector('.contact-preview');
+    if (contact.dataset.lastMessageId == e.messageId) {
+
+        if (preview) preview.innerText = "🗑️ Message deleted";
+
     }
+}
+function scrollToBottom() {
+    setTimeout(() => {
+        chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+    }, 50);
 }
 
 //  DELETE 
+// function initDelete() {
+//     document.addEventListener('click', function (e) {
+//         const msgDiv = e.target.closest('.message');
+//         if (!msgDiv || !msgDiv.classList.contains('outgoing')) return;
+
+//         const msgId = msgDiv.dataset.id;
+
+//         if (confirm("Delete this message?")) {
+//             fetch(`/delete-message/${msgId}`, {
+//                 method: 'DELETE',
+//                 headers: { 'X-CSRF-TOKEN': token }
+//             });
+//         }
+//     });
+// }
 function initDelete() {
     document.addEventListener('click', function (e) {
+
         const msgDiv = e.target.closest('.message');
-        if (!msgDiv || !msgDiv.classList.contains('outgoing')) return;
+
+        if (!msgDiv) return;
+        if (!msgDiv.classList.contains('outgoing')) return;
 
         const msgId = msgDiv.dataset.id;
+
+        if (!msgId) return;
 
         if (confirm("Delete this message?")) {
             fetch(`/delete-message/${msgId}`, {
@@ -390,3 +570,5 @@ function markDeliveredOnLoad() {
         headers: { 'X-CSRF-TOKEN': token }
     });
 }
+
+

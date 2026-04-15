@@ -28,10 +28,32 @@ class SendMessage implements ShouldBroadcastNow
     {
         return 'message.sent';
     }
-        public function broadcastWith()
-    {
-        return [
-            'message' => $this->message, 
-        ];
-    }
+    //     public function broadcastWith()
+    // {
+    //     return [
+    //         'message' => $this->message, 
+    //     ];
+    // }
+
+    public function broadcastWith()
+{
+    return [
+        'id' => $this->message->id,
+        'chat_messages' => $this->message->chat_messages,
+        'sender_id' => $this->message->sender_id,
+        'receiver_id' => $this->message->receiver_id,
+
+        'file_url' => $this->message->file_path
+            ? asset('storage/'.$this->message->file_path)
+            : null,
+
+        'file_type' => $this->message->file_type,
+
+        'sender_image' => $this->message->sender && $this->message->sender->profile_img
+            ? asset('storage/profile_images/'.$this->message->sender->profile_img)
+            : null,
+
+        'created_at' => $this->message->created_at,
+    ];
+}
 }

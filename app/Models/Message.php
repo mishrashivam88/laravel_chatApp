@@ -16,7 +16,9 @@ class Message extends Model
         'receiver_id', 
         'seen',
         'delivered',
-        'deleted_at'
+        'deleted_at',
+         'file_path',
+         'file_type'
     ];
 
     public function sender(){
